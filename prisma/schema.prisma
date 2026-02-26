@@ -1,0 +1,231 @@
+// Prisma schema for QUMA Finance SaaS
+// One user = one organization
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  user
+  admin
+}
+
+enum Currency {
+  ARS
+  USD
+  EUR
+}
+
+enum CategoryType {
+  ingreso
+  gasto
+  movimiento
+}
+
+enum CategoryStatus {
+  activa
+  inactiva
+}
+
+enum PartyStatus {
+  activo
+  inactivo
+}
+
+enum IncomeStatus {
+  cobrado
+  pendiente
+  vencido
+}
+
+enum ExpenseStatus {
+  pagado
+  pendiente
+  vencido
+}
+
+enum PaymentMethod {
+  efectivo
+  transferencia
+  cheque
+  tarjeta
+  otro
+}
+
+enum MovementType {
+  ingreso
+  egreso
+}
+
+enum AccountType {
+  caja
+  banco_cuenta_corriente
+  banco_caja_ahorro
+  mercadopago
+  otra
+}
+
+model User {
+  id             String       @id @default(cuid())
+  email          String       @unique
+  name           String?
+  passwordHash   String
+  role           Role         @default(user)
+
+  organizationId String       @unique
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  tax_id    String?
+  address   String?
+  phone     String?
+  email     String?
+  status    String   @default("activa")
+
+  user      User?
+
+  categories      Category[]
+  customers       Customer[]
+  suppliers       Supplier[]
+  incomes         Income[]
+  expenses        Expense[]
+  cashMovements   CashBankMovement[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Category {
+  id              String         @id @default(cuid())
+  organizationId  String
+  organization    Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  name            String
+  type            CategoryType
+  description     String?
+  color           String         @default("slate")
+  status          CategoryStatus @default(activa)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@unique([organizationId, name, type])
+}
+
+model Customer {
+  id              String       @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  name            String
+  tax_id          String?
+  email           String?
+  phone           String?
+  category        String?
+  status          PartyStatus  @default(activo)
+  notes           String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+}
+
+model Supplier {
+  id              String       @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  name            String
+  tax_id          String?
+  email           String?
+  phone           String?
+  category        String?
+  status          PartyStatus  @default(activo)
+  notes           String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+}
+
+model Income {
+  id              String        @id @default(cuid())
+  organizationId  String
+  organization    Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  date            DateTime
+  description     String?
+  customer_name   String?
+  category        String?
+  amount          Decimal       @db.Decimal(18, 2)
+  currency        Currency      @default(ARS)
+  payment_method  PaymentMethod?
+  invoice_number  String?
+  status          IncomeStatus  @default(cobrado)
+  estimated_date  DateTime?
+  notes           String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId, date])
+}
+
+model Expense {
+  id              String        @id @default(cuid())
+  organizationId  String
+  organization    Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  date            DateTime
+  description     String?
+  supplier_name   String?
+  category        String?
+  amount          Decimal       @db.Decimal(18, 2)
+  currency        Currency      @default(ARS)
+  payment_method  PaymentMethod?
+  invoice_number  String?
+  status          ExpenseStatus @default(pagado)
+  estimated_date  DateTime?
+  notes           String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId, date])
+}
+
+model CashBankMovement {
+  id              String       @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  date            DateTime
+  type            MovementType
+  account         AccountType
+  category        String?
+  description     String?
+  amount          Decimal      @db.Decimal(18, 2)
+  currency        Currency     @default(ARS)
+  reference       String?
+  balance_after   Decimal?     @db.Decimal(18, 2)
+  notes           String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId, date])
+}
