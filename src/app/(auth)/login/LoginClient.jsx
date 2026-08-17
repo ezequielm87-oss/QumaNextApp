@@ -70,10 +70,15 @@ export default function LoginClient() {
               {loading ? "Ingresando…" : "Ingresar"}
             </Button>
 
-            <div className="text-sm text-slate-600">
-              ¿No tenés cuenta?{" "}
-              <a className="text-teal-700 hover:underline" href="/register">
-                Registrate
+            <div className="text-sm text-slate-600 flex items-center justify-between">
+              <span>
+                ¿No tenés cuenta?{" "}
+                <a className="text-teal-700 hover:underline" href="/register">
+                  Registrate
+                </a>
+              </span>
+              <a className="text-teal-700 hover:underline" href="/forgot-password">
+                Olvidé mi contraseña
               </a>
             </div>
           </form>

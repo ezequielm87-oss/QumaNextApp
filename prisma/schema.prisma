@@ -81,8 +81,24 @@ model User {
   organizationId String       @unique
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
+  passwordResetTokens PasswordResetToken[]
+
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
 }
 
 model Organization {
@@ -102,6 +118,8 @@ model Organization {
   incomes         Income[]
   expenses        Expense[]
   cashMovements   CashBankMovement[]
+  customDashboards CustomDashboard[]
+  financialReports FinancialReport[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -207,6 +225,40 @@ model Expense {
   updatedAt DateTime @updatedAt
 
   @@index([organizationId, date])
+}
+
+model CustomDashboard {
+  id              String       @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  title           String
+  description     String?
+  charts_config   String       @db.Text
+  prompt_used     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+}
+
+model FinancialReport {
+  id              String       @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  title           String
+  type            String
+  period_from     DateTime?
+  period_to       DateTime?
+  content         String       @db.Text
+  prompt_used     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
 }
 
 model CashBankMovement {

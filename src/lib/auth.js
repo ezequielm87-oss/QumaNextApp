@@ -1,10 +1,10 @@
-import NextAuth from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
-import { prisma } from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
+import { prisma } from '@/lib/prisma';
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
-  session: { strategy: 'jwt' },
+// Fuente única de verdad para la config de NextAuth (v4).
+// Usada por: app/api/auth/[...nextauth]/route.js, api-helpers.js, src/middleware.js
+export const authOptions = {
   providers: [
     Credentials({
       name: 'Credentials',
@@ -17,10 +17,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const password = credentials?.password;
         if (!email || !password) return null;
 
-        const user = await prisma.user.findUnique({
-          where: { email },
-          include: { organization: true },
-        });
+        const user = await prisma.user.findUnique({ where: { email } });
         if (!user) return null;
 
         const ok = await bcrypt.compare(password, user.passwordHash);
@@ -29,34 +26,33 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         return {
           id: user.id,
           email: user.email,
-          name: user.name ?? undefined,
+          name: user.name ?? user.email,
           role: user.role,
           organizationId: user.organizationId,
-          organizationName: user.organization?.name,
         };
       },
     }),
   ],
+  session: { strategy: 'jwt' },
+  pages: {
+    signIn: '/login',
+  },
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
+        token.sub = user.id;
         token.role = user.role;
         token.organizationId = user.organizationId;
-        token.organizationName = user.organizationName;
       }
       return token;
     },
     async session({ session, token }) {
-      if (session.user) {
+      if (session?.user) {
         session.user.id = token.sub;
         session.user.role = token.role;
         session.user.organizationId = token.organizationId;
-        session.user.organizationName = token.organizationName;
       }
       return session;
     },
   },
-  pages: {
-    signIn: '/login',
-  },
-});
+};

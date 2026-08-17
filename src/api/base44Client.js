@@ -66,5 +66,19 @@ export const base44 = {
     Expense: makeEntity('expenses'),
     CashBankMovement: makeEntity('cashbank'),
     Organization: makeEntity('organizations'),
+    CustomDashboard: makeEntity('customdashboards'),
+    FinancialReport: makeEntity('financialreports'),
+  },
+  integrations: {
+    Core: {
+      // Reemplaza el InvokeLLM de base44: pega contra /api/ai/invoke, que llama a Gemini server-side.
+      InvokeLLM: async ({ prompt, response_json_schema } = {}) => {
+        const result = await apiFetch('/api/ai/invoke', {
+          method: 'POST',
+          body: { prompt, response_json_schema },
+        });
+        return response_json_schema ? result : result.text;
+      },
+    },
   },
 };

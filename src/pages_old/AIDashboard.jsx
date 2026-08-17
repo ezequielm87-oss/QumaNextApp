@@ -60,6 +60,7 @@ function AIChart({ config }) {
 export default function AIDashboard() {
   const [prompt, setPrompt] = useState("");
   const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState(null);
   const qc = useQueryClient();
   const { selectedOrgId } = useOrganization();
 
@@ -87,6 +88,7 @@ export default function AIDashboard() {
   const generateDashboard = async () => {
     if (!prompt.trim()) return;
     setGenerating(true);
+    setError(null);
 
     const summaryData = {
       total_ingresos: incomes.reduce((s, i) => s + (i.amount || 0), 0),
@@ -116,8 +118,9 @@ export default function AIDashboard() {
       summaryData.movimientos_por_cuenta[m.account || "otra"] = (summaryData.movimientos_por_cuenta[m.account || "otra"] || 0) + (m.amount || 0);
     });
 
-    const result = await base44.integrations.Core.InvokeLLM({
-      prompt: `Sos un experto financiero y analista de datos. El usuario quiere un dashboard personalizado con estos datos financieros:
+    try {
+      const result = await base44.integrations.Core.InvokeLLM({
+        prompt: `Sos un experto financiero y analista de datos. El usuario quiere un dashboard personalizado con estos datos financieros:
 
 DATOS FINANCIEROS:
 ${JSON.stringify(summaryData, null, 2)}
@@ -127,40 +130,44 @@ SOLICITUD DEL USUARIO: "${prompt}"
 Generá un dashboard con entre 2 y 4 gráficos relevantes. Cada gráfico debe tener datos reales basados en la información provista.
 IMPORTANTE: Los tipos de gráfico válidos son: "bar", "line", "area", "pie".
 Los datos deben ser arrays de objetos con "name" y "value" como keys principales.`,
-      response_json_schema: {
-        type: "object",
-        properties: {
-          title: { type: "string" },
-          description: { type: "string" },
-          charts: {
-            type: "array",
-            items: {
-              type: "object",
-              properties: {
-                type: { type: "string" },
-                title: { type: "string" },
-                data: { type: "array", items: { type: "object", properties: { name: { type: "string" }, value: { type: "number" } } } },
-                dataKey: { type: "string" },
-                nameKey: { type: "string" },
-                xKey: { type: "string" },
+        response_json_schema: {
+          type: "object",
+          properties: {
+            title: { type: "string" },
+            description: { type: "string" },
+            charts: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  type: { type: "string" },
+                  title: { type: "string" },
+                  data: { type: "array", items: { type: "object", properties: { name: { type: "string" }, value: { type: "number" } } } },
+                  dataKey: { type: "string" },
+                  nameKey: { type: "string" },
+                  xKey: { type: "string" },
+                }
               }
             }
           }
         }
-      }
-    });
+      });
 
-    await base44.entities.CustomDashboard.create({
-      title: result.title || "Dashboard Personalizado",
-      description: result.description || "",
-      charts_config: JSON.stringify(result.charts || []),
-      prompt_used: prompt,
-      organization_id: selectedOrgId,
-    });
+      await base44.entities.CustomDashboard.create({
+        title: result.title || "Dashboard Personalizado",
+        description: result.description || "",
+        charts_config: JSON.stringify(result.charts || []),
+        prompt_used: prompt,
+        organization_id: selectedOrgId,
+      });
 
-    qc.invalidateQueries({ queryKey: ["custom-dashboards", selectedOrgId] });
-    setPrompt("");
-    setGenerating(false);
+      qc.invalidateQueries({ queryKey: ["custom-dashboards", selectedOrgId] });
+      setPrompt("");
+    } catch (err) {
+      setError(err?.data?.error || err?.message || "No se pudo generar el dashboard.");
+    } finally {
+      setGenerating(false);
+    }
   };
 
   const deleteDashboard = async (id) => {
@@ -190,6 +197,7 @@ Los datos deben ser arrays de objetos con "name" y "value" como keys principales
           className="bg-white/10 border-white/20 text-white placeholder:text-slate-500 mb-4"
           rows={3}
         />
+        {error && <p className="text-sm text-red-400 mb-4">{error}</p>}
         <Button
           onClick={generateDashboard}
           disabled={generating || !prompt.trim()}

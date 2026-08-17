@@ -19,6 +19,7 @@ export default function AIReports() {
   const [periodTo, setPeriodTo] = useState("");
   const [customPrompt, setCustomPrompt] = useState("");
   const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
   const qc = useQueryClient();
   const { selectedOrgId } = useOrganization();
@@ -66,6 +67,7 @@ export default function AIReports() {
 
   const generateReport = async () => {
     setGenerating(true);
+    setError(null);
 
     const filteredIncomes = incomes.filter(i => {
       if (periodFrom && i.date < periodFrom) return false;
@@ -117,9 +119,10 @@ export default function AIReports() {
       personalizado: customPrompt || "Generá un reporte financiero personalizado.",
     };
 
-    const result = await base44.integrations.Core.InvokeLLM({
-      prompt: `Sos un director financiero (CFO) experto de QUMA Finance, una boutique de finanzas estratégicas para PyMEs.
-      
+    try {
+      const result = await base44.integrations.Core.InvokeLLM({
+        prompt: `Sos un director financiero (CFO) experto de QUMA Finance, una boutique de finanzas estratégicas para PyMEs.
+
 Generá un reporte financiero profesional en formato markdown con la siguiente información:
 
 TIPO DE REPORTE: ${typeLabels[reportType]}
@@ -137,20 +140,24 @@ El reporte debe incluir:
 - Usar formato profesional con headers, bullet points, tablas en markdown
 - Montos en formato $XX.XXX,XX (pesos argentinos)
 - Tono profesional pero accesible para un emprendedor/PyME`,
-    });
+      });
 
-    await base44.entities.FinancialReport.create({
-      title: `${typeLabels[reportType]} - ${periodFrom ? format(new Date(periodFrom), "dd/MM/yyyy") : "Inicio"} a ${periodTo ? format(new Date(periodTo), "dd/MM/yyyy") : "Hoy"}`,
-      type: reportType,
-      period_from: periodFrom || undefined,
-      period_to: periodTo || undefined,
-      content: result,
-      prompt_used: typePrompts[reportType],
-      organization_id: selectedOrgId,
-    });
+      await base44.entities.FinancialReport.create({
+        title: `${typeLabels[reportType]} - ${periodFrom ? format(new Date(periodFrom), "dd/MM/yyyy") : "Inicio"} a ${periodTo ? format(new Date(periodTo), "dd/MM/yyyy") : "Hoy"}`,
+        type: reportType,
+        period_from: periodFrom || undefined,
+        period_to: periodTo || undefined,
+        content: result,
+        prompt_used: typePrompts[reportType],
+        organization_id: selectedOrgId,
+      });
 
-    qc.invalidateQueries({ queryKey: ["reports", selectedOrgId] });
-    setGenerating(false);
+      qc.invalidateQueries({ queryKey: ["reports", selectedOrgId] });
+    } catch (err) {
+      setError(err?.data?.error || err?.message || "No se pudo generar el reporte.");
+    } finally {
+      setGenerating(false);
+    }
   };
 
   const deleteReport = async (id) => {
@@ -210,6 +217,7 @@ El reporte debe incluir:
           />
         )}
 
+        {error && <p className="text-sm text-red-400 mb-4">{error}</p>}
         <Button
           onClick={generateReport}
           disabled={generating}
